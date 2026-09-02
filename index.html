@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>小学听写工具</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --panel: #ffffff;
+      --panel-2: #eef3ff;
+      --text: #152033;
+      --muted: #60708a;
+      --border: #d7deea;
+      --accent: #2f6fed;
+      --accent-2: #10b981;
+      --danger: #e25a5a;
+      --shadow: 0 10px 30px rgba(21, 32, 51, 0.08);
+      --radius: 10px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+      background: linear-gradient(180deg, #f7f9fe 0%, #eef4ff 100%);
+      color: var(--text);
+    }
+
+    .app {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 18px;
+      display: grid;
+      gap: 16px;
+      grid-template-columns: 330px 1fr;
+      min-height: 100%;
+    }
+
+    header {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 16px;
+      padding: 8px 0 4px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1.15;
+    }
+
+    .subtitle {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .pill {
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.7);
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      color: var(--muted);
+      box-shadow: 0 4px 14px rgba(21,32,51,0.04);
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 16px;
+    }
+
+    .panel h2 {
+      margin: 0 0 12px;
+      font-size: 18px;
+    }
+
+    .stack { display: grid; gap: 12px; }
+    .row { display: grid; gap: 10px; }
+    .grid-2 { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid-3 { display: grid; gap: 12px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+    select, input, textarea, button { font: inherit; }
+    select, input, textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text);
+      border-radius: 8px;
+      padding: 11px 12px;
+      outline: none;
+    }
+    textarea { min-height: 150px; resize: vertical; line-height: 1.6; }
+    select:focus, input:focus, textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(47,111,237,0.12);
+    }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 10px; }
+    button {
+      border: 0;
+      border-radius: 8px;
+      padding: 11px 14px;
+      cursor: pointer;
+      transition: transform .08s ease, opacity .15s ease, background .15s ease;
+    }
+    button:hover { transform: translateY(-1px); }
+    button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+    .primary { background: var(--accent); color: #fff; }
+    .success { background: var(--accent-2); color: #fff; }
+    .ghost { background: #eef3ff; color: var(--text); }
+    .danger { background: #fdeaea; color: #b32424; }
+    .toggle { display: flex; gap: 10px; flex-wrap: wrap; }
+    .toggle button { background: #edf2fb; color: var(--muted); }
+    .toggle button.active { background: var(--accent); color: #fff; }
+    .status {
+      padding: 12px;
+      border-radius: 8px;
+      background: var(--panel-2);
+      border: 1px solid #dce6ff;
+      color: #30456d;
+      line-height: 1.6;
+      min-height: 56px;
+    }
+    .current {
+      display: grid;
+      gap: 10px;
+      padding: 16px;
+      border-radius: 10px;
+      background: linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%);
+      border: 1px solid #d9e3fb;
+    }
+    .current-word {
+      font-size: 42px;
+      font-weight: 700;
+      letter-spacing: 0;
+      word-break: break-word;
+      line-height: 1.15;
+    }
+    .current-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .list {
+      display: grid;
+      gap: 8px;
+      max-height: 520px;
+      overflow: auto;
+      padding-right: 2px;
+    }
+    .item {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #fff;
+    }
+    .item.active { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(47,111,237,0.08); }
+    .item .title { font-weight: 600; word-break: break-word; }
+    .item .desc { font-size: 13px; color: var(--muted); margin-top: 2px; word-break: break-word; }
+    .check-result { font-weight: 700; }
+    .ok { color: #168a4b; }
+    .bad { color: #b32424; }
+    .small { font-size: 13px; color: var(--muted); }
+    .separator { height: 1px; background: var(--border); margin: 4px 0; }
+    .inline { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+    .mobile-tabs { display: none; }
+    .mobile-dock { display: none; }
+
+    @media (max-width: 980px) {
+      .app { grid-template-columns: 1fr; }
+      header { align-items: start; flex-direction: column; }
+      .pill-row { justify-content: flex-start; }
+      .current-word { font-size: 38px; }
+    }
+
+    @media (max-width: 640px) {
+      .app { padding: 12px; gap: 12px; }
+      h1 { font-size: 22px; }
+      .subtitle { font-size: 13px; }
+      .panel { padding: 12px; }
+      .panel h2 { font-size: 16px; }
+      .current { padding: 12px; }
+      .current-word { font-size: 30px; }
+      .current-meta { font-size: 12px; gap: 6px; }
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+      .btn-row button, .toggle button { flex: 1 1 calc(50% - 8px); min-width: 0; }
+      .btn-row button { padding: 12px 10px; }
+      .toggle { gap: 8px; }
+      .toggle button { flex: 1 1 calc(50% - 8px); padding: 12px 10px; }
+      .mobile-tabs {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+      .mobile-tabs button {
+        background: #edf2fb;
+        color: var(--muted);
+        padding: 12px 10px;
+        border-radius: 10px;
+      }
+      .mobile-tabs button.active { background: var(--accent); color: #fff; }
+      .panel[data-panel] { display: none; }
+      .panel[data-panel].active { display: grid; }
+      .mobile-dock {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+        position: sticky;
+        bottom: 10px;
+        margin-top: 4px;
+        padding: 10px;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: rgba(255,255,255,0.94);
+        backdrop-filter: blur(8px);
+        box-shadow: 0 12px 28px rgba(21,32,51,0.14);
+        z-index: 20;
+      }
+      .mobile-dock button { padding: 12px 8px; border-radius: 10px; }
+      .current .btn-row { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div>
+        <h1>小学语文 / 英语听写工具</h1>
+        <div class="subtitle">适合家长带读、老师课堂听写，支持朗读、暂停、自动切题和本地题库编辑。</div>
+      </div>
+      <div class="pill-row">
+        <div class="pill" id="progressPill">0 / 0</div>
+        <div class="pill" id="modePill">当前：语文</div>
+        <div class="pill" id="voicePill">语音：系统默认</div>
+      </div>
+    </header>
+
+    <div class="mobile-tabs">
+      <button type="button" class="active" data-mobile-tab="practice">听写</button>
+      <button type="button" data-mobile-tab="settings">设置</button>
+      <button type="button" data-mobile-tab="words">题库</button>
+    </div>
+
+    <section class="panel stack" data-panel="settings">
+      <div>
+        <h2>听写设置</h2>
+        <div class="row">
+          <div>
+            <label for="subject">科目</label>
+            <select id="subject"></select>
+          </div>
+          <div>
+            <label for="voiceSelect">朗读声音</label>
+            <select id="voiceSelect"></select>
+          </div>
+        </div>
+
+        <div class="grid-3">
+          <div>
+            <label for="speed">朗读速度</label>
+            <input id="speed" type="range" min="0.6" max="1.4" step="0.1" value="1" />
+            <div class="small">当前速度：<span id="speedValue">1.0x</span></div>
+          </div>
+          <div>
+            <label for="interval">每题间隔</label>
+            <input id="interval" type="range" min="2" max="10" step="1" value="4" />
+            <div class="small">当前间隔：<span id="intervalValue">4</span> 秒</div>
+          </div>
+          <div>
+            <label for="repeatCount">朗读次数</label>
+            <input id="repeatCount" type="number" min="1" max="5" step="1" value="1" />
+            <div class="small">当前次数：<span id="repeatValue">1</span> 次</div>
+          </div>
+        </div>
+
+        <div class="toggle">
+          <button id="autoPlayBtn" class="active">自动朗读：开</button>
+          <button id="shuffleBtn">顺序：正序</button>
+          <button id="speechHintBtn">提示：开</button>
+          <button id="voiceControlBtn">语音控制：关</button>
+        </div>
+        <div class="small" id="voiceControlStatus">语音控制：关闭</div>
+      </div>
+    </section>
+
+    <section class="panel stack active" data-panel="practice">
+      <div class="current">
+        <div class="current-meta">
+          <span id="currentIndex">第 1 题</span>
+          <span id="currentSubject">语文</span>
+          <span id="stateText">等待开始</span>
+        </div>
+        <div class="current-word" id="currentWord">准备开始</div>
+        <div class="btn-row">
+          <button class="primary" id="speakBtn">朗读当前题</button>
+          <button class="success" id="nextBtn">下一题</button>
+          <button class="ghost" id="prevBtn">上一题</button>
+          <button class="danger" id="stopBtn">停止</button>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="panel" style="padding:14px; box-shadow:none;">
+          <h2>学生作答</h2>
+          <div class="inline">
+            <input id="answerInput" type="text" placeholder="在这里输入答案" />
+            <button class="primary" id="checkBtn">批改</button>
+          </div>
+          <div class="status" id="checkStatus">系统会显示本题正确与否，以及标准答案。</div>
+        </div>
+
+        <div class="panel" style="padding:14px; box-shadow:none;">
+          <h2>常用操作</h2>
+          <div class="mobile-dock">
+            <button class="primary" id="dockSpeakBtn">朗读</button>
+            <button class="success" id="dockNextBtn">下一题</button>
+            <button class="ghost" id="dockCheckBtn">批改</button>
+            <button class="danger" id="dockVoiceBtn">语音</button>
+          </div>
+          <div class="small">手机上可以直接用底部快捷按钮操作。</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel stack" data-panel="words">
+      <div>
+        <h2>题库编辑</h2>
+        <div class="small">每行一个词语或单词。保存后只存在于这台电脑的浏览器里。</div>
+        <div style="margin-top:10px;">
+          <textarea id="editor" placeholder="例如：\n春天\n阳光\nbeautiful\nlibrary"></textarea>
+        </div>
+        <div class="btn-row" style="margin-top:10px;">
+          <button class="primary" id="saveListBtn">保存题库</button>
+          <button class="ghost" id="resetListBtn">恢复默认</button>
+        </div>
+      </div>
+
+      <div class="list" id="wordList"></div>
+    </section>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'primary_dictation_tool_v3';
+    const DEFAULT_DATA = {
+      chinese: ['春天', '阳光', '校园', '认真', '朋友', '故事', '快乐', '学习', '老师', '小鸟', '书包', '语文', '课本', '操场', '风景'],
+      english: ['apple', 'banana', 'school', 'teacher', 'friend', 'family', 'beautiful', 'morning', 'library', 'holiday', 'classroom', 'question', 'answer', 'picture', 'tomorrow']
+    };
+
+    const els = {
+      subject: document.getElementById('subject'),
+      voiceSelect: document.getElementById('voiceSelect'),
+      speed: document.getElementById('speed'),
+      interval: document.getElementById('interval'),
+      repeatCount: document.getElementById('repeatCount'),
+      autoPlayBtn: document.getElementById('autoPlayBtn'),
+      shuffleBtn: document.getElementById('shuffleBtn'),
+      speechHintBtn: document.getElementById('speechHintBtn'),
+      voiceControlBtn: document.getElementById('voiceControlBtn'),
+      saveListBtn: document.getElementById('saveListBtn'),
+      resetListBtn: document.getElementById('resetListBtn'),
+      speakBtn: document.getElementById('speakBtn'),
+      nextBtn: document.getElementById('nextBtn'),
+      prevBtn: document.getElementById('prevBtn'),
+      stopBtn: document.getElementById('stopBtn'),
+      checkBtn: document.getElementById('checkBtn'),
+      dockSpeakBtn: document.getElementById('dockSpeakBtn'),
+      dockNextBtn: document.getElementById('dockNextBtn'),
+      dockCheckBtn: document.getElementById('dockCheckBtn'),
+      dockVoiceBtn: document.getElementById('dockVoiceBtn'),
+      answerInput: document.getElementById('answerInput'),
+      editor: document.getElementById('editor'),
+      currentWord: document.getElementById('currentWord'),
+      currentIndex: document.getElementById('currentIndex'),
+      currentSubject: document.getElementById('currentSubject'),
+      stateText: document.getElementById('stateText'),
+      checkStatus: document.getElementById('checkStatus'),
+      wordList: document.getElementById('wordList'),
+      progressPill: document.getElementById('progressPill'),
+      modePill: document.getElementById('modePill'),
+      voicePill: document.getElementById('voicePill'),
+      speedValue: document.getElementById('speedValue'),
+      intervalValue: document.getElementById('intervalValue'),
+      repeatValue: document.getElementById('repeatValue'),
+      voiceControlStatus: document.getElementById('voiceControlStatus'),
+      panels: Array.from(document.querySelectorAll('[data-panel]')),
+      mobileTabs: Array.from(document.querySelectorAll('[data-mobile-tab]'))
+    };
+
+    const state = {
+      subject: 'chinese',
+      autoPlay: true,
+      shuffle: false,
+      speechHint: true,
+      voiceControl: false,
+      voiceListening: false,
+      voiceRecognizer: null,
+      voiceCommandCooldown: false,
+      currentIndex: 0,
+      timer: null,
+      voices: [],
+      voiceURI: '',
+      repeatCount: 1,
+      data: loadData(),
+      displayOrder: { chinese: [], english: [] },
+      activePanel: 'practice'
+    };
+
+    function loadData() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return structuredClone(DEFAULT_DATA);
+        const parsed = JSON.parse(raw);
+        return {
+          chinese: Array.isArray(parsed.chinese) && parsed.chinese.length ? parsed.chinese : structuredClone(DEFAULT_DATA.chinese),
+          english: Array.isArray(parsed.english) && parsed.english.length ? parsed.english : structuredClone(DEFAULT_DATA.english)
+        };
+      } catch {
+        return structuredClone(DEFAULT_DATA);
+      }
+    }
+
+    function saveData() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state.data)); }
+
+    function refreshOrder(subject = state.subject) {
+      const source = [...state.data[subject]];
+      if (state.shuffle) {
+        for (let i = source.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [source[i], source[j]] = [source[j], source[i]];
+        }
+      }
+      state.displayOrder[subject] = source;
+    }
+
+    function activeList() { return state.displayOrder[state.subject] || state.data[state.subject]; }
+    function currentList() { return activeList(); }
+    function clampIndex() {
+      const list = currentList();
+      if (!list.length) { state.currentIndex = 0; return; }
+      state.currentIndex = Math.max(0, Math.min(state.currentIndex, list.length - 1));
+    }
+    function getCurrentWord() { const list = currentList(); return list[state.currentIndex] || ''; }
+    function normalizeText(text) {
+      return String(text).trim().toLowerCase().replace(/[\s\u3000]+/g, ' ').replace(/[，。！？；：、,.!?;:]/g, '').replace(/\s+/g, '');
+    }
+    function escapeHtml(str) { return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+
+    function updateTimerLabel() {
+      els.speedValue.textContent = `${Number(els.speed.value).toFixed(1)}x`;
+      els.intervalValue.textContent = els.interval.value;
+      els.repeatValue.textContent = String(Math.max(1, Number(els.repeatCount.value) || 1));
+    }
+
+    function updatePills() {
+      const list = currentList();
+      els.progressPill.textContent = `${Math.min(state.currentIndex + 1, list.length || 0)} / ${list.length}`;
+      els.modePill.textContent = `当前：${state.subject === 'chinese' ? '语文' : '英语'}`;
+      els.voicePill.textContent = `语音：${els.voiceSelect.selectedOptions[0]?.textContent || '系统默认'}`;
+    }
+
+    function updateVoiceControlStatus(message) {
+      if (message) {
+        els.voiceControlStatus.textContent = message;
+        return;
+      }
+      if (!state.voiceControl) els.voiceControlStatus.textContent = '语音控制：关闭';
+      else if (state.voiceListening) els.voiceControlStatus.textContent = '语音控制：监听中';
+      else els.voiceControlStatus.textContent = '语音控制：启动中';
+    }
+
+    function renderSubjectOptions() {
+      els.subject.innerHTML = '<option value="chinese">语文</option><option value="english">英语</option>';
+      els.subject.value = state.subject;
+    }
+
+    function renderVoices() {
+      const voices = window.speechSynthesis?.getVoices?.() || [];
+      state.voices = voices;
+      const options = ['<option value="">系统默认</option>'];
+      voices.forEach((voice, index) => {
+        const label = `${voice.name}${voice.lang ? ` (${voice.lang})` : ''}`;
+        options.push(`<option value="${index}">${label}</option>`);
+      });
+      els.voiceSelect.innerHTML = options.join('');
+      if (state.voiceURI) {
+        const idx = voices.findIndex(v => v.voiceURI === state.voiceURI);
+        els.voiceSelect.value = idx >= 0 ? String(idx) : '';
+      }
+      updatePills();
+    }
+
+    function setActivePanel(panelName) {
+      state.activePanel = panelName;
+      els.panels.forEach((panel) => {
+        panel.classList.toggle('active', panel.dataset.panel === panelName);
+      });
+      els.mobileTabs.forEach((btn) => {
+        btn.classList.toggle('active', btn.dataset.mobileTab === panelName);
+      });
+    }
+
+    function renderList() {
+      const list = currentList();
+      els.wordList.innerHTML = '';
+      if (!list.length) {
+        els.wordList.innerHTML = '<div class="small">题库为空，请先在左侧编辑并保存。</div>';
+        return;
+      }
+      list.forEach((word, index) => {
+        const item = document.createElement('div');
+        item.className = `item${index === state.currentIndex ? ' active' : ''}`;
+        item.innerHTML = `<div><div class="title">${index + 1}. ${escapeHtml(word)}</div><div class="desc">点击可跳转到这一题</div></div><button class="ghost">选择</button>`;
+        item.querySelector('button').addEventListener('click', () => { state.currentIndex = index; refreshAll(); speakCurrent(); });
+        els.wordList.appendChild(item);
+      });
+    }
+
+    function renderCurrent() {
+      const list = currentList();
+      clampIndex();
+      const word = getCurrentWord();
+      els.currentWord.textContent = word || '题库为空';
+      els.currentIndex.textContent = list.length ? `第 ${state.currentIndex + 1} 题` : '无题目';
+      els.currentSubject.textContent = state.subject === 'chinese' ? '语文' : '英语';
+      els.stateText.textContent = list.length ? (state.autoPlay ? '自动听写中' : '已暂停自动播放') : '请先添加题目';
+      els.checkStatus.textContent = '系统会显示本题正确与否，以及标准答案。';
+      els.answerInput.value = '';
+    }
+
+    function setButtonStates() {
+      els.autoPlayBtn.textContent = `自动朗读：${state.autoPlay ? '开' : '关'}`;
+      els.autoPlayBtn.classList.toggle('active', state.autoPlay);
+      els.shuffleBtn.textContent = `顺序：${state.shuffle ? '乱序' : '正序'}`;
+      els.shuffleBtn.classList.toggle('active', state.shuffle);
+      els.speechHintBtn.textContent = `提示：${state.speechHint ? '开' : '关'}`;
+      els.speechHintBtn.classList.toggle('active', state.speechHint);
+      els.voiceControlBtn.textContent = `语音控制：${state.voiceControl ? '开' : '关'}`;
+      els.voiceControlBtn.classList.toggle('active', state.voiceControl);
+      updateVoiceControlStatus();
+    }
+
+    function refreshAll() {
+      updateTimerLabel();
+      setButtonStates();
+      updatePills();
+      renderCurrent();
+      renderList();
+    }
+
+    function selectVoice() { const index = els.voiceSelect.value; if (index === '') return null; return state.voices[Number(index)] || null; }
+
+    function pauseVoiceControl() {
+      if (state.voiceRecognizer) {
+        try { state.voiceRecognizer.abort(); } catch { try { state.voiceRecognizer.stop(); } catch {} }
+      }
+      state.voiceListening = false;
+    }
+
+    function resolveVoiceCommand(text) {
+      const value = normalizeText(text);
+      if (!value) return null;
+      if (value.includes('上一题') || value.includes('上一个') || value.includes('返回')) return 'prev';
+      if (value.includes('下一题') || value.includes('下一个') || value.includes('继续') || value.includes('确认') || value.includes('过')) return 'next';
+      if (value.includes('朗读') || value.includes('重读') || value.includes('再读') || value.includes('重复')) return 'repeat';
+      if (value.includes('停止') || value.includes('关闭')) return 'stop';
+      return null;
+    }
+
+    function getRecognitionCtor() { return window.SpeechRecognition || window.webkitSpeechRecognition || null; }
+
+    function startVoiceControl() {
+      const Recognition = getRecognitionCtor();
+      if (!Recognition) {
+        state.voiceControl = false;
+        pauseVoiceControl();
+        updateVoiceControlStatus('当前浏览器不支持语音控制');
+        return;
+      }
+      pauseVoiceControl();
+      const recognition = new Recognition();
+      state.voiceRecognizer = recognition;
+      recognition.lang = 'zh-CN';
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+      recognition.onstart = () => { state.voiceListening = true; updateVoiceControlStatus(); };
+      recognition.onresult = (event) => {
+        if (state.voiceCommandCooldown) return;
+        let transcript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const result = event.results[i];
+          if (result.isFinal) transcript += result[0].transcript;
+        }
+        transcript = transcript.trim();
+        if (!transcript) return;
+        const command = resolveVoiceCommand(transcript);
+        updateVoiceControlStatus(`已识别：${transcript}`);
+        if (!command) return;
+        state.voiceCommandCooldown = true;
+        setTimeout(() => { state.voiceCommandCooldown = false; }, 1200);
+        if (command === 'next') nextWord(true);
+        else if (command === 'prev') prevWord(true);
+        else if (command === 'repeat') speakCurrent();
+        else if (command === 'stop') setVoiceControlEnabled(false);
+        try { recognition.stop(); } catch {}
+      };
+      recognition.onerror = (event) => { state.voiceListening = false; updateVoiceControlStatus(`语音控制错误：${event.error || '未知错误'}`); };
+      recognition.onend = () => {
+        state.voiceListening = false;
+        updateVoiceControlStatus();
+        if (state.voiceControl) {
+          setTimeout(() => { if (state.voiceControl) startVoiceControl(); }, 400);
+        }
+      };
+      updateVoiceControlStatus('正在开启语音命令...');
+      try { recognition.start(); } catch { state.voiceControl = false; updateVoiceControlStatus('语音控制无法启动'); }
+    }
+
+    function setVoiceControlEnabled(enabled) {
+      state.voiceControl = enabled;
+      state.voiceCommandCooldown = false;
+      if (!enabled) {
+        pauseVoiceControl();
+        updateVoiceControlStatus('语音控制：关闭');
+        return;
+      }
+      startVoiceControl();
+    }
+
+    function stopSpeaking() {
+      if (state.timer) { clearTimeout(state.timer); state.timer = null; }
+      window.speechSynthesis.cancel();
+    }
+
+    function scheduleNext() {
+      if (!state.autoPlay) return;
+      if (state.timer) clearTimeout(state.timer);
+      const delay = Number(els.interval.value) * 1000;
+      state.timer = setTimeout(() => {
+        const list = currentList();
+        if (!list.length) return;
+        state.currentIndex = (state.currentIndex + 1) % list.length;
+        refreshAll();
+        speakCurrent();
+      }, delay);
+    }
+
+    function speakCurrent() {
+      stopSpeaking();
+      if (state.voiceControl) pauseVoiceControl();
+      const word = getCurrentWord();
+      if (!word) return;
+      const utterance = new SpeechSynthesisUtterance(word);
+      const selectedVoice = selectVoice();
+      if (selectedVoice) { utterance.voice = selectedVoice; state.voiceURI = selectedVoice.voiceURI; }
+      utterance.rate = Number(els.speed.value);
+      utterance.pitch = state.subject === 'english' ? 1.05 : 1.0;
+      utterance.lang = state.subject === 'english' ? 'en-US' : 'zh-CN';
+      const repeat = Math.max(1, Number(els.repeatCount.value) || 1);
+      let count = 0;
+      utterance.onstart = () => { els.stateText.textContent = '正在朗读'; };
+      utterance.onend = () => {
+        count += 1;
+        if (count < repeat) {
+          setTimeout(() => window.speechSynthesis.speak(utterance), 180);
+          return;
+        }
+        els.stateText.textContent = state.autoPlay ? '等待下一题' : '已停止';
+        if (state.autoPlay) scheduleNext();
+        if (state.voiceControl) startVoiceControl();
+      };
+      utterance.onerror = () => { els.stateText.textContent = '语音朗读失败，请检查浏览器语音支持'; };
+      window.speechSynthesis.speak(utterance);
+    }
+
+    function nextWord(forceSpeak = state.autoPlay) {
+      const list = currentList();
+      if (!list.length) return;
+      state.currentIndex = (state.currentIndex + 1) % list.length;
+      refreshAll();
+      if (forceSpeak) speakCurrent();
+    }
+
+    function prevWord(forceSpeak = state.autoPlay) {
+      const list = currentList();
+      if (!list.length) return;
+      state.currentIndex = (state.currentIndex - 1 + list.length) % list.length;
+      refreshAll();
+      if (forceSpeak) speakCurrent();
+    }
+
+    function checkAnswer() {
+      const expected = getCurrentWord();
+      const answer = els.answerInput.value;
+      if (!expected) return;
+      const correct = normalizeText(answer) === normalizeText(expected);
+      els.checkStatus.innerHTML = correct ? `<span class="check-result ok">回答正确</span>，标准答案：<strong>${escapeHtml(expected)}</strong>` : `<span class="check-result bad">需要再看一看</span>，标准答案：<strong>${escapeHtml(expected)}</strong>`;
+    }
+
+    function saveEditorList() {
+      const lines = els.editor.value.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+      if (!lines.length) { alert('题库不能为空。'); return; }
+      state.data[state.subject] = lines;
+      refreshOrder(); saveData(); state.currentIndex = 0; refreshAll(); els.checkStatus.textContent = '题库已保存。';
+    }
+
+    function resetEditorList() {
+      state.data[state.subject] = structuredClone(DEFAULT_DATA[state.subject]);
+      refreshOrder(); saveData(); state.currentIndex = 0; refreshAll(); els.checkStatus.textContent = '已恢复默认题库。';
+    }
+
+    function switchSubject(subject) {
+      state.subject = subject;
+      state.currentIndex = 0;
+      refreshOrder(subject);
+      updateEditor();
+      refreshAll();
+      if (window.innerWidth <= 640) setActivePanel('practice');
+    }
+
+    function updateEditor() { els.editor.value = state.data[state.subject].join('\n'); }
+
+    function setActivePanel(panelName) {
+      state.activePanel = panelName;
+      els.panels.forEach((panel) => panel.classList.toggle('active', panel.dataset.panel === panelName));
+      els.mobileTabs.forEach((btn) => btn.classList.toggle('active', btn.dataset.mobileTab === panelName));
+    }
+
+    els.subject.addEventListener('change', () => switchSubject(els.subject.value));
+    els.voiceSelect.addEventListener('change', () => { const selected = selectVoice(); state.voiceURI = selected?.voiceURI || ''; updatePills(); });
+    els.speed.addEventListener('input', updateTimerLabel);
+    els.interval.addEventListener('input', updateTimerLabel);
+    els.repeatCount.addEventListener('input', updateTimerLabel);
+    els.autoPlayBtn.addEventListener('click', () => { state.autoPlay = !state.autoPlay; if (!state.autoPlay) stopSpeaking(); refreshAll(); });
+    els.shuffleBtn.addEventListener('click', () => { state.shuffle = !state.shuffle; state.currentIndex = 0; refreshOrder(); refreshAll(); });
+    els.speechHintBtn.addEventListener('click', () => { state.speechHint = !state.speechHint; refreshAll(); });
+    els.voiceControlBtn.addEventListener('click', () => { setVoiceControlEnabled(!state.voiceControl); refreshAll(); });
+    els.saveListBtn.addEventListener('click', saveEditorList);
+    els.resetListBtn.addEventListener('click', resetEditorList);
+    els.speakBtn.addEventListener('click', speakCurrent);
+    els.nextBtn.addEventListener('click', () => nextWord());
+    els.prevBtn.addEventListener('click', () => prevWord());
+    els.stopBtn.addEventListener('click', () => { state.autoPlay = false; setVoiceControlEnabled(false); stopSpeaking(); refreshAll(); });
+    els.checkBtn.addEventListener('click', checkAnswer);
+    els.dockSpeakBtn.addEventListener('click', speakCurrent);
+    els.dockNextBtn.addEventListener('click', () => nextWord());
+    els.dockCheckBtn.addEventListener('click', checkAnswer);
+    els.dockVoiceBtn.addEventListener('click', () => { setVoiceControlEnabled(!state.voiceControl); refreshAll(); });
+    els.answerInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') checkAnswer(); });
+    els.mobileTabs.forEach((btn) => btn.addEventListener('click', () => setActivePanel(btn.dataset.mobileTab)));
+
+    document.addEventListener('keydown', (e) => {
+      if (e.target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName) && e.key !== 'Escape') return;
+      if (e.key === 'ArrowRight') nextWord();
+      if (e.key === 'ArrowLeft') prevWord();
+      if (e.key === ' ') { e.preventDefault(); speakCurrent(); }
+    });
+
+    function refreshAll() {
+      updateTimerLabel();
+      setButtonStates();
+      updatePills();
+      renderCurrent();
+      renderList();
+      updateVoiceControlStatus();
+    }
+
+    function setButtonStates() {
+      els.autoPlayBtn.textContent = `自动朗读：${state.autoPlay ? '开' : '关'}`;
+      els.autoPlayBtn.classList.toggle('active', state.autoPlay);
+      els.shuffleBtn.textContent = `顺序：${state.shuffle ? '乱序' : '正序'}`;
+      els.shuffleBtn.classList.toggle('active', state.shuffle);
+      els.speechHintBtn.textContent = `提示：${state.speechHint ? '开' : '关'}`;
+      els.speechHintBtn.classList.toggle('active', state.speechHint);
+      els.voiceControlBtn.textContent = `语音控制：${state.voiceControl ? '开' : '关'}`;
+      els.voiceControlBtn.classList.toggle('active', state.voiceControl);
+      if (state.voiceControl) els.dockVoiceBtn.classList.add('active'); else els.dockVoiceBtn.classList.remove('active');
+    }
+
+    function init() {
+      renderSubjectOptions();
+      refreshOrder('chinese');
+      refreshOrder('english');
+      updateEditor();
+      updateTimerLabel();
+      refreshAll();
+      window.speechSynthesis?.addEventListener?.('voiceschanged', renderVoices);
+      renderVoices();
+      if (!state.speechHint) els.speechHintBtn.classList.remove('active');
+      if (!state.autoPlay) els.autoPlayBtn.classList.remove('active');
+      if (!state.voiceControl) els.voiceControlBtn.classList.remove('active');
+      els.currentWord.textContent = getCurrentWord() || '准备开始';
+      updateVoiceControlStatus();
+      setActivePanel(window.innerWidth <= 640 ? 'practice' : 'practice');
+    }
+
+    init();
+  </script>
+</body>
+</html>
