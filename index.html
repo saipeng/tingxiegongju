@@ -155,6 +155,31 @@
     .separator { height: 1px; background: var(--border); margin: 4px 0; }
     .mobile-tabs { display: none; }
     .mobile-dock { display: none; }
+    .voice-fallback[hidden] { display: none; }
+    .voice-fallback {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid #d9e3fb;
+      border-radius: 10px;
+      background: #f8fbff;
+    }
+    .voice-command-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+    }
+    .voice-quick-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .voice-quick-row button {
+      background: #edf2fb;
+      color: var(--text);
+      padding: 9px 11px;
+    }
 
     @media (max-width: 980px) {
       .app { grid-template-columns: 1fr; }
@@ -205,6 +230,8 @@
       }
       .mobile-dock button { padding: 12px 8px; border-radius: 10px; }
       .current .btn-row { display: none; }
+      .voice-command-row { grid-template-columns: 1fr; }
+      .voice-quick-row button { flex: 1 1 calc(50% - 8px); }
     }
   </style>
 </head>
@@ -251,6 +278,20 @@
       </div>
 
       <div class="small">手机上优先点“朗读”一次，再用“下一题”或语音命令，会更稳。</div>
+      <div class="voice-fallback" id="voiceFallbackPanel" hidden>
+        <label for="voiceCommandInput">手机备用口令</label>
+        <div class="voice-command-row">
+          <input id="voiceCommandInput" type="text" autocomplete="off" placeholder="点这里，用键盘麦克风说：下一题 / 上一题 / 重读 / 停止" />
+          <button class="primary" id="voiceCommandRunBtn">执行</button>
+        </div>
+        <div class="voice-quick-row">
+          <button type="button" data-voice-command="下一题">下一题</button>
+          <button type="button" data-voice-command="上一题">上一题</button>
+          <button type="button" data-voice-command="重读">重读</button>
+          <button type="button" data-voice-command="停止">停止</button>
+        </div>
+        <div class="small">当前浏览器没有可用的后台语音识别时，可用手机键盘自带的麦克风输入口令。</div>
+      </div>
     </section>
 
     <section class="panel stack" data-panel="settings">
@@ -349,6 +390,10 @@
       dockSpeakBtn: document.getElementById('dockSpeakBtn'),
       dockNextBtn: document.getElementById('dockNextBtn'),
       dockVoiceBtn: document.getElementById('dockVoiceBtn'),
+      voiceFallbackPanel: document.getElementById('voiceFallbackPanel'),
+      voiceCommandInput: document.getElementById('voiceCommandInput'),
+      voiceCommandRunBtn: document.getElementById('voiceCommandRunBtn'),
+      voiceQuickBtns: Array.from(document.querySelectorAll('[data-voice-command]')),
       editor: document.getElementById('editor'),
       currentWord: document.getElementById('currentWord'),
       currentIndex: document.getElementById('currentIndex'),
@@ -369,13 +414,17 @@
 
     const state = {
       subject: 'chinese',
-      autoPlay: true,
+      // 手机上的浏览器只允许由一次明确的点击/触摸启动音频。初始不自动
+      // 播放，用户点“自动朗读：开”后再开始本轮播放，后续切题可连续播放。
+      autoPlay: false,
       shuffle: false,
       speechHint: true,
       voiceControl: false,
       voiceListening: false,
       voiceRecognizer: null,
       voiceCommandCooldown: false,
+      voiceFallback: false,
+      voiceFallbackTimer: null,
       currentIndex: 0,
       timer: null,
       data: loadData(),
@@ -392,8 +441,9 @@
         if (!raw) return structuredClone(DEFAULT_DATA);
         const parsed = JSON.parse(raw);
         return {
-          chinese: Array.isArray(parsed.chinese) && parsed.chinese.length ? parsed.chinese : structuredClone(DEFAULT_DATA.chinese),
-          english: Array.isArray(parsed.english) && parsed.english.length ? parsed.english : structuredClone(DEFAULT_DATA.english)
+          // 空数组代表用户明确清空过词库，不能在下次打开页面时又恢复默认词库。
+          chinese: Array.isArray(parsed.chinese) ? parsed.chinese : structuredClone(DEFAULT_DATA.chinese),
+          english: Array.isArray(parsed.english) ? parsed.english : structuredClone(DEFAULT_DATA.english)
         };
       } catch {
         return structuredClone(DEFAULT_DATA);
@@ -489,6 +539,7 @@
         return;
       }
       if (!state.voiceControl) els.voiceControlStatus.textContent = '语音控制：关闭';
+      else if (state.voiceFallback) els.voiceControlStatus.textContent = '备用口令：点输入框后使用手机键盘麦克风';
       else if (state.voiceListening) els.voiceControlStatus.textContent = '语音控制：监听中';
       else els.voiceControlStatus.textContent = '语音控制：启动中';
     }
@@ -550,9 +601,14 @@
       els.shuffleBtn.classList.toggle('active', state.shuffle);
       els.speechHintBtn.textContent = `提示：${state.speechHint ? '开' : '关'}`;
       els.speechHintBtn.classList.toggle('active', state.speechHint);
-      els.voiceControlBtn.textContent = `语音控制：${state.voiceControl ? '开' : '关'}`;
+      els.voiceControlBtn.textContent = `语音控制：${state.voiceControl ? (state.voiceFallback ? '备用' : '开') : '关'}`;
       els.voiceControlBtn.classList.toggle('active', state.voiceControl);
       if (state.voiceControl) els.dockVoiceBtn.classList.add('active'); else els.dockVoiceBtn.classList.remove('active');
+      els.dockVoiceBtn.textContent = state.voiceFallback ? '口令' : '语音';
+    }
+
+    function updateVoiceFallbackPanel() {
+      els.voiceFallbackPanel.hidden = !state.voiceFallback;
     }
 
     function refreshAll() {
@@ -561,6 +617,7 @@
       updatePills();
       renderCurrent();
       renderList();
+      updateVoiceFallbackPanel();
       updateVoiceControlStatus();
       updateTtsStatus();
     }
@@ -576,8 +633,11 @@
     }
 
     function pauseVoiceControl() {
-      if (state.voiceRecognizer) {
-        try { state.voiceRecognizer.abort(); } catch { try { state.voiceRecognizer.stop(); } catch {} }
+      const recognition = state.voiceRecognizer;
+      // 先断开引用：abort() 会异步触发 onend，避免旧实例把监听又启动起来。
+      state.voiceRecognizer = null;
+      if (recognition) {
+        try { recognition.abort(); } catch { try { recognition.stop(); } catch {} }
       }
       state.voiceListening = false;
     }
@@ -585,10 +645,10 @@
     function resolveVoiceCommand(text) {
       const value = normalizeText(text);
       if (!value) return null;
-      if (value.includes('上一题') || value.includes('上一个') || value.includes('返回')) return 'prev';
-      if (value.includes('下一题') || value.includes('下一个') || value.includes('继续') || value.includes('确认') || value.includes('过')) return 'next';
-      if (value.includes('朗读') || value.includes('重读') || value.includes('再读') || value.includes('重复')) return 'repeat';
-      if (value.includes('停止') || value.includes('关闭')) return 'stop';
+      if (value.includes('上一题') || value.includes('上一个') || value.includes('返回') || value.includes('previous') || value.includes('prev') || value.includes('back')) return 'prev';
+      if (value.includes('下一题') || value.includes('下一个') || value.includes('继续') || value.includes('确认') || value.includes('过') || value.includes('next')) return 'next';
+      if (value.includes('朗读') || value.includes('重读') || value.includes('再读') || value.includes('重复') || value.includes('repeat') || value.includes('again')) return 'repeat';
+      if (value.includes('停止') || value.includes('关闭') || value.includes('stop') || value.includes('off')) return 'stop';
       return null;
     }
 
@@ -596,26 +656,72 @@
       return window.SpeechRecognition || window.webkitSpeechRecognition || null;
     }
 
+    function executeVoiceCommand(command, transcript = '') {
+      if (!command || state.voiceCommandCooldown) return false;
+      state.voiceCommandCooldown = true;
+      setTimeout(() => { state.voiceCommandCooldown = false; }, 1200);
+      if (transcript) updateVoiceControlStatus(`已识别：${transcript}`);
+      if (command === 'next') nextWord(true);
+      else if (command === 'prev') prevWord(true);
+      else if (command === 'repeat') speakCurrent();
+      else if (command === 'stop') setVoiceControlEnabled(false);
+      return true;
+    }
+
+    function handleVoiceText(text) {
+      const transcript = String(text || '').trim();
+      if (!transcript) return false;
+      const command = resolveVoiceCommand(transcript);
+      if (!command) {
+        updateVoiceControlStatus(`未识别口令：${transcript}`);
+        return false;
+      }
+      executeVoiceCommand(command, transcript);
+      return true;
+    }
+
+    function runFallbackVoiceCommand() {
+      const handled = handleVoiceText(els.voiceCommandInput.value);
+      if (handled) {
+        els.voiceCommandInput.value = '';
+        if (state.voiceFallback) els.voiceCommandInput.focus();
+      }
+    }
+
+    function activateVoiceFallback(message) {
+      state.voiceControl = true;
+      state.voiceFallback = true;
+      pauseVoiceControl();
+      if (window.innerWidth <= 640) setActivePanel('practice');
+      updateVoiceFallbackPanel();
+      refreshAll();
+      updateVoiceControlStatus(message || '已切换为手机备用口令');
+      els.voiceCommandInput.focus();
+    }
+
     function startVoiceControl() {
       const Recognition = getRecognitionCtor();
       if (!Recognition) {
-        state.voiceControl = false;
-        pauseVoiceControl();
-        updateVoiceControlStatus('当前浏览器不支持语音控制');
+        activateVoiceFallback('当前浏览器不支持后台语音识别，已切换为备用口令');
         return;
       }
+      state.voiceFallback = false;
       pauseVoiceControl();
       const recognition = new Recognition();
       state.voiceRecognizer = recognition;
       recognition.lang = 'zh-CN';
-      recognition.continuous = true;
+      // 移动版 Chrome/Safari 对 continuous 支持不稳定；每次结果结束后
+      // 立即续听，比长连接更可靠。
+      recognition.continuous = false;
       recognition.interimResults = false;
       recognition.maxAlternatives = 1;
       recognition.onstart = () => {
+        if (state.voiceRecognizer !== recognition) return;
         state.voiceListening = true;
         updateVoiceControlStatus();
       };
       recognition.onresult = (event) => {
+        if (state.voiceRecognizer !== recognition) return;
         if (state.voiceCommandCooldown) return;
         let transcript = '';
         for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -625,21 +731,23 @@
         transcript = transcript.trim();
         if (!transcript) return;
         const command = resolveVoiceCommand(transcript);
-        updateVoiceControlStatus(`已识别：${transcript}`);
         if (!command) return;
-        state.voiceCommandCooldown = true;
-        setTimeout(() => { state.voiceCommandCooldown = false; }, 1200);
-        if (command === 'next') nextWord(true);
-        else if (command === 'prev') prevWord(true);
-        else if (command === 'repeat') speakCurrent();
-        else if (command === 'stop') setVoiceControlEnabled(false);
+        executeVoiceCommand(command, transcript);
         try { recognition.stop(); } catch {}
       };
       recognition.onerror = (event) => {
+        if (state.voiceRecognizer !== recognition) return;
         state.voiceListening = false;
-        updateVoiceControlStatus(`语音控制错误：${event.error || '未知错误'}`);
+        const messages = {
+          'not-allowed': '未获得麦克风权限，请在浏览器设置中允许麦克风',
+          'service-not-allowed': '浏览器禁止了语音识别服务',
+          'audio-capture': '找不到可用麦克风',
+          'network': '语音识别需要网络连接'
+        };
+        updateVoiceControlStatus(messages[event.error] || `语音控制错误：${event.error || '未知错误'}`);
       };
       recognition.onend = () => {
+        if (state.voiceRecognizer !== recognition) return;
         state.voiceListening = false;
         updateVoiceControlStatus();
         if (state.voiceControl) {
@@ -651,13 +759,16 @@
       updateVoiceControlStatus('正在开启语音命令...');
       try {
         recognition.start();
-      } catch {
-        state.voiceControl = false;
-        updateVoiceControlStatus('语音控制无法启动');
+      } catch (error) {
+        if (state.voiceRecognizer === recognition) {
+          state.voiceControl = false;
+          state.voiceRecognizer = null;
+          updateVoiceControlStatus('语音控制无法启动，请重新点击并允许麦克风');
+        }
       }
     }
 
-    function setVoiceControlEnabled(enabled) {
+    async function setVoiceControlEnabled(enabled) {
       state.voiceControl = enabled;
       state.voiceCommandCooldown = false;
       if (!enabled) {
@@ -665,6 +776,20 @@
         updateVoiceControlStatus('语音控制：关闭');
         return;
       }
+      // 在按钮点击的调用链中主动请求权限，移动端不会把它当成后台请求。
+      if (navigator.mediaDevices?.getUserMedia) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          stream.getTracks().forEach((track) => track.stop());
+        } catch (error) {
+          state.voiceControl = false;
+          const denied = error && ['NotAllowedError', 'SecurityError'].includes(error.name);
+          updateVoiceControlStatus(denied ? '未获得麦克风权限，请允许后重试' : '无法使用麦克风，请检查浏览器权限');
+          refreshAll();
+          return;
+        }
+      }
+      if (!state.voiceControl) return;
       startVoiceControl();
     }
 
@@ -766,6 +891,9 @@
         if (state.voiceControl) startVoiceControl();
       } catch {
         els.stateText.textContent = '朗读失败，请检查网络或浏览器权限';
+      } finally {
+        // 朗读失败时也恢复语音命令，避免手机端一次网络波动后监听永久停止。
+        if (state.voiceControl && !state.voiceRecognizer) startVoiceControl();
       }
     }
 
@@ -845,6 +973,7 @@
       refreshOrder();
       saveData();
       state.currentIndex = 0;
+      els.editor.value = '';
       refreshAll();
     }
 
@@ -873,6 +1002,7 @@
     els.autoPlayBtn.addEventListener('click', () => {
       state.autoPlay = !state.autoPlay;
       if (!state.autoPlay) stopSpeaking();
+      else speakCurrent();
       refreshAll();
     });
     els.shuffleBtn.addEventListener('click', () => {
